@@ -73,27 +73,26 @@ Clone the repository and install dependencies:
 git clone https://github.com/your-username/house-price-fairness.git
 ```
 ## Dependencies:
-Python 3.x
-pandas
-numpy
-matplotlib
-seaborn
-scikit-learn
-google.colab (if running in Colab)
+- Python 3.x
+- pandas
+- numpy
+- matplotlib
+- seaborn
+- scikit-learn
+- google.colab (if running in Colab)
 
 ## 📊 Results
 The Random Forest model achieved:
-Low MAE (better price prediction accuracy).
-Reasonable fairness classification with tolerance ±15–30%.
-Insights from EDA show significant differences in urban vs rural pricing patterns.
+- Low MAE (better price prediction accuracy).
+- Reasonable fairness classification with tolerance ±15–30%.
+- Insights from EDA show significant differences in urban vs rural pricing patterns.
 
 ## 👥 Contributors
-Savindi IT22132482 – Preprocessing
-Buddhima IT22640666 – Outlier removal & EDA
-Buwaneka IT22250438 – Advanced EDA
-Praneepa IT22544704 – Model Training & Fairness Classification
+- S.P. WIdyasekara        – Preprocessing
+- K.D.B.S. Senadeera      – Outlier removal & further preprocess
+- B.D.F. Fernando         – Advanced EDA
+- K.K.G.P.N. Samaraweera  – Model Training & Fairness Classification
 
 ## 📜 License
 This project is licensed under the MIT License – free to use and modify.
-cd house-price-fairness
-pip install -r requirements.txt
+
