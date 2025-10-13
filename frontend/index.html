@@ -1,0 +1,602 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Property Price Analyzer</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 40px;
+            animation: fadeInDown 0.8s ease-out;
+        }
+
+        .header h1 {
+            font-size: 3em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+        }
+
+        .header p {
+            font-size: 1.2em;
+            opacity: 0.9;
+        }
+
+        .main-content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            animation: fadeInUp 0.8s ease-out;
+        }
+
+        .card {
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+
+        .card h2 {
+            color: #667eea;
+            margin-bottom: 30px;
+            font-size: 1.8em;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .form-group {
+            margin-bottom: 25px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: #333;
+            font-weight: 600;
+            font-size: 0.95em;
+        }
+
+        .form-group input,
+        .form-group select {
+            width: 100%;
+            padding: 12px 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            font-size: 1em;
+            transition: all 0.3s ease;
+            background: #f8f9fa;
+        }
+
+        .form-group input:focus,
+        .form-group select:focus {
+            outline: none;
+            border-color: #667eea;
+            background: white;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        .analyze-btn {
+            width: 100%;
+            padding: 15px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 1.1em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-top: 10px;
+        }
+
+        .analyze-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 30px rgba(102, 126, 234, 0.4);
+        }
+
+        .analyze-btn:active {
+            transform: translateY(0);
+        }
+
+        .analyze-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .results-container {
+            display: none;
+        }
+
+        .results-container.active {
+            display: block;
+            animation: slideIn 0.5s ease-out;
+        }
+
+        .result-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            border-radius: 15px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        .result-card.fair {
+            background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+        }
+
+        .result-card.overpriced {
+            background: linear-gradient(135deg, #eb3349 0%, #f45c43 100%);
+        }
+
+        .result-card.underpriced {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+        }
+
+        .result-status {
+            font-size: 2.5em;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+
+        .result-subtitle {
+            font-size: 1.1em;
+            opacity: 0.95;
+        }
+
+        .price-comparison {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .price-box {
+            background: rgba(255,255,255,0.15);
+            backdrop-filter: blur(10px);
+            padding: 20px;
+            border-radius: 10px;
+            border: 2px solid rgba(255,255,255,0.2);
+        }
+
+        .price-label {
+            font-size: 0.9em;
+            opacity: 0.9;
+            margin-bottom: 5px;
+        }
+
+        .price-value {
+            font-size: 1.8em;
+            font-weight: bold;
+        }
+
+        .difference-badge {
+            display: inline-block;
+            padding: 8px 20px;
+            background: rgba(255,255,255,0.2);
+            border-radius: 20px;
+            margin-top: 15px;
+            font-size: 1.1em;
+        }
+
+        .similar-properties {
+            margin-top: 30px;
+        }
+
+        .property-item {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: all 0.3s ease;
+            border-left: 4px solid #667eea;
+        }
+
+        .property-item:hover {
+            transform: translateX(5px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+
+        .property-info h4 {
+            color: #333;
+            margin-bottom: 5px;
+        }
+
+        .property-details {
+            color: #666;
+            font-size: 0.9em;
+        }
+
+        .property-price {
+            font-size: 1.3em;
+            font-weight: bold;
+            color: #667eea;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #999;
+        }
+
+        .empty-state svg {
+            width: 120px;
+            height: 120px;
+            margin-bottom: 20px;
+            opacity: 0.5;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 20px;
+        }
+
+        .loading.active {
+            display: block;
+        }
+
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto;
+        }
+
+        .error-message {
+            background: #fee;
+            color: #c33;
+            padding: 15px;
+            border-radius: 10px;
+            margin-top: 15px;
+            display: none;
+        }
+
+        .error-message.active {
+            display: block;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        @keyframes fadeInDown {
+            from {
+                opacity: 0;
+                transform: translateY(-30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateX(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        @media (max-width: 968px) {
+            .main-content {
+                grid-template-columns: 1fr;
+            }
+
+            .form-row {
+                grid-template-columns: 1fr;
+            }
+
+            .header h1 {
+                font-size: 2em;
+            }
+
+            .price-comparison {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .icon {
+            width: 24px;
+            height: 24px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🏠 Property Price Analyzer</h1>
+            <p>Get instant fairness analysis for your property price</p>
+        </div>
+
+        <div class="main-content">
+            <div class="card">
+                <h2>
+                    <svg class="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
+                    </svg>
+                    Property Details
+                </h2>
+                
+                <form id="propertyForm">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Super Area (sq ft)</label>
+                            <input type="number" id="superArea" required placeholder="e.g., 1500" min="100">
+                        </div>
+                        <div class="form-group">
+                            <label>Carpet Area (sq ft)</label>
+                            <input type="number" id="carpetArea" required placeholder="e.g., 1200" min="100">
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Car Parking</label>
+                            <select id="carParking" required>
+                                <option value="">Select</option>
+                                <option value="0">None</option>
+                                <option value="1">Open</option>
+                                <option value="2">Covered</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Balcony</label>
+                            <select id="balcony" required>
+                                <option value="">Select</option>
+                                <option value="0">None</option>
+                                <option value="1">1 Balcony</option>
+                                <option value="2">2 Balconies</option>
+                                <option value="3">3+ Balconies</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Bathroom</label>
+                            <select id="bathroom" required>
+                                <option value="">Select</option>
+                                <option value="1">1 Bathroom</option>
+                                <option value="2">2 Bathrooms</option>
+                                <option value="3">3 Bathrooms</option>
+                                <option value="4">4+ Bathrooms</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Furnished Status</label>
+                            <select id="furnishing" required>
+                                <option value="">Select</option>
+                                <option value="Furnished">Furnished</option>
+                                <option value="Semi-Furnished">Semi-Furnished</option>
+                                <option value="Unfurnished">Unfurnished</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Price (Rs.)</label>
+                        <input type="number" id="price" required placeholder="e.g., 12000000" min="100000">
+                    </div>
+
+                    <div class="form-group">
+                        <label>Location</label>
+                        <select id="location" required>
+                            <option value="">Select Location</option>
+                            <option value="Colombo">Colombo</option>
+                            <option value="Colombo Suburbs">Colombo Suburbs</option>
+                            <option value="Other Urban">Other Urban</option>
+                            <option value="Other Rural">Other Rural</option>
+                        </select>
+                    </div>
+
+                    <button type="submit" class="analyze-btn" id="submitBtn">Analyze Property Value</button>
+                </form>
+
+                <div class="loading" id="loading">
+                    <div class="spinner"></div>
+                    <p style="margin-top: 15px; color: #666;">Analyzing...</p>
+                </div>
+
+                <div class="error-message" id="errorMessage"></div>
+            </div>
+
+            <div class="card">
+                <h2>
+                    <svg class="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                    </svg>
+                    Property Analysis
+                </h2>
+
+                <div id="resultsContainer" class="results-container">
+                    <div id="resultCard" class="result-card">
+                        <div class="result-status" id="resultStatus">Fair Price</div>
+                        <div class="result-subtitle" id="resultSubtitle">Your property is fairly priced</div>
+                        
+                        <div class="price-comparison">
+                            <div class="price-box">
+                                <div class="price-label">Your Price</div>
+                                <div class="price-value" id="enteredPrice">Rs. 0</div>
+                            </div>
+                            <div class="price-box">
+                                <div class="price-label">Fair Market Price</div>
+                                <div class="price-value" id="fairPrice">Rs. 0</div>
+                            </div>
+                        </div>
+
+                        <div class="difference-badge" id="differenceBadge">
+                            Difference: Rs. 0 (0%)
+                        </div>
+                    </div>
+
+                    <div class="similar-properties">
+                        <h3 style="color: #333; margin-bottom: 20px;">Similar Properties</h3>
+                        <div class="property-item">
+                            <div class="property-info">
+                                <h4>Luxury Apartment</h4>
+                                <div class="property-details">Colombo 05 • 2 Beds • 2 Baths</div>
+                            </div>
+                            <div class="property-price">Rs. 12,200,000</div>
+                        </div>
+                        <div class="property-item">
+                            <div class="property-info">
+                                <h4>Modern Condo</h4>
+                                <div class="property-details">Colombo 05 • 3 Beds • 3 Baths</div>
+                            </div>
+                            <div class="property-price">Rs. 14,500,000</div>
+                        </div>
+                        <div class="property-item">
+                            <div class="property-info">
+                                <h4>City View Apartment</h4>
+                                <div class="property-details">Colombo 07 • 2 Beds • 2 Baths</div>
+                            </div>
+                            <div class="property-price">Rs. 11,750,000</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="empty-state" id="emptyState">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                    </svg>
+                    <p>Enter property details and click "Analyze Property Value" to see the analysis</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const form = document.getElementById('propertyForm');
+        const resultsContainer = document.getElementById('resultsContainer');
+        const emptyState = document.getElementById('emptyState');
+        const loading = document.getElementById('loading');
+        const resultCard = document.getElementById('resultCard');
+        const submitBtn = document.getElementById('submitBtn');
+        const errorMessage = document.getElementById('errorMessage');
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const formData = {
+                super_area: document.getElementById('superArea').value,
+                carpet_area: document.getElementById('carpetArea').value,
+                car_parking: document.getElementById('carParking').value,
+                balcony: document.getElementById('balcony').value,
+                bathroom: document.getElementById('bathroom').value,
+                furnishing: document.getElementById('furnishing').value,
+                price: document.getElementById('price').value,
+                location: document.getElementById('location').value
+            };
+
+            // Show loading
+            loading.classList.add('active');
+            emptyState.style.display = 'none';
+            resultsContainer.classList.remove('active');
+            errorMessage.classList.remove('active');
+            submitBtn.disabled = true;
+
+            try {
+                const response = await fetch('/analyze', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(formData)
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok) {
+                    displayResults(result);
+                } else {
+                    showError(result.error || 'An error occurred. Please try again.');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                showError('Unable to connect to the server. Please make sure the server is running.');
+            } finally {
+                loading.classList.remove('active');
+                submitBtn.disabled = false;
+            }
+        });
+
+        function displayResults(result) {
+            const statusMessages = {
+                'Fair': 'Your property is fairly priced! 🎯',
+                'Overpriced': 'This property appears overpriced 📈',
+                'Underpriced': 'This property appears underpriced 📉'
+            };
+            
+            resultCard.className = `result-card ${result.status.toLowerCase()}`;
+            document.getElementById('resultStatus').textContent = result.status;
+            document.getElementById('resultSubtitle').textContent = statusMessages[result.status];
+            document.getElementById('enteredPrice').textContent = `Rs. ${formatNumber(result.entered_price)}`;
+            document.getElementById('fairPrice').textContent = `Rs. ${formatNumber(Math.round(result.fair_price))}`;
+            
+            const diffText = result.difference >= 0 ? '+' : '';
+            document.getElementById('differenceBadge').textContent = 
+                `Difference: ${diffText}Rs. ${formatNumber(Math.round(result.difference))} (${result.percentage_diff >= 0 ? '+' : ''}${result.percentage_diff.toFixed(1)}%)`;
+            
+            resultsContainer.classList.add('active');
+        }
+
+        function showError(message) {
+            errorMessage.textContent = message;
+            errorMessage.classList.add('active');
+        }
+
+        function formatNumber(num) {
+            return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+        }
+    </script>
+</body>
+</html>
