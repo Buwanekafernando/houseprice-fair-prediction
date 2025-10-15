@@ -1,25 +1,20 @@
-# app.py  (Flask API for price fairness)  — UPDATED to use tuned & compact model
 from flask import Flask, render_template, request, jsonify
 import json
 import numpy as np
 import pandas as pd
-
-# [UPDATED] use joblib instead of pickle (compressed .joblib model)
 from joblib import load
 
-app = Flask(__name__ , template_folder="frontend")
+# [CHANGED] point Flask to "frontend" folder (your index.html lives here)
+app = Flask(__name__, template_folder="frontend")
 
-# -----------------------------
-# Model + feature schema loading
-# -----------------------------
-MODEL_PATH = "rf_price_model_xz.joblib"       # [UPDATED]
-FEATS_PATH = "model_features.json"            # [UPDATED]
+MODEL_PATH = "rf_price_model_xz.joblib"
+FEATS_PATH = "model_features.json"
 
 model = None
 final_features = None
 
 try:
-    model = load(MODEL_PATH)  # tuned + compact RF with compression
+    model = load(MODEL_PATH)
     print("✅ Model loaded successfully!")
 except Exception as e:
     print(f"❌ Failed to load model: {e}")
@@ -31,70 +26,82 @@ try:
 except Exception as e:
     print(f"❌ Failed to load feature schema: {e}")
 
-# -----------------------------
-# Mappings (must match training)
-# -----------------------------
-location_map = {"Colombo": 4, "Colombo Suburbs": 3, "Other Urban": 2, "Other Rural": 1}
+# Furnishing numeric map (same as training)
 furnish_map  = {"Furnished": 3, "Semi-Furnished": 2, "Unfurnished": 1}
 
-# -----------------------------
-# Helpers
-# -----------------------------
 def make_model_input(payload: dict) -> pd.DataFrame:
     """
-    Convert incoming JSON to the model-ready DataFrame:
-    - Apply the SAME mappings used in training
-    - Keep EXACT column order expected by the model (final_features)
-    - Cast to float32 to match training dtype
+    Build a 1-row DataFrame with the SAME encoding used in training:
+    - one-hot for Location (Loc_*)
+    - numeric features cast to float32
+    - Carpet_Area ≤ Super_Area validation
     """
-    # Validate required keys early for clearer messages
-    required_keys = [
-        "location", "super_area", "carpet_area", "bathroom",
-        "furnishing", "car_parking", "balcony", "price"
-    ]
-    missing = [k for k in required_keys if k not in payload]
+    required = ["location","super_area","carpet_area","bathroom","furnishing","car_parking","balcony","price"]
+    missing = [k for k in required if k not in payload]
     if missing:
         raise ValueError(f"Missing required fields: {missing}")
 
-    # Map categorical to numeric (raise if value not recognized)
+    # Parse numerics
     try:
-        loc_val = location_map[payload["location"]]
-    except KeyError:
-        raise ValueError(f"Unknown location: {payload['location']}")
+        super_area  = float(payload["super_area"])
+        carpet_area = float(payload["carpet_area"])
+        bathroom    = int(payload["bathroom"])
+        car_parking = int(payload["car_parking"])
+        balcony     = int(payload["balcony"])
+        price       = float(payload["price"])
+    except Exception:
+        raise ValueError("One or more numeric fields are invalid.")
 
+    if super_area <= 0 or carpet_area <= 0:
+        raise ValueError("Areas must be greater than zero.")
+    if carpet_area > super_area:  # [CHANGED] strong validation
+        raise ValueError("Carpet Area cannot be greater than Super Area.")
+    if price <= 0:
+        raise ValueError("Price must be greater than zero.")
+
+    # Furnishing -> numeric
     try:
         furn_val = furnish_map[payload["furnishing"]]
     except KeyError:
         raise ValueError(f"Unknown furnishing: {payload['furnishing']}")
 
-    # Build a single-row dict in *training feature names*
+    location_str = str(payload["location"]).strip()
+
+    # Base row (non-location)
     row = {
-        "Location":      loc_val,
-        "Super_Area":    float(payload["super_area"]),
-        "Carpet_Area":   float(payload["carpet_area"]),
-        "Bathroom":      int(payload["bathroom"]),
-        "Furnishing":    furn_val,
-        "Car_Parking":   int(payload["car_parking"]),
-        "Balcony":       int(payload["balcony"]),
+        "Super_Area":  super_area,
+        "Carpet_Area": carpet_area,
+        "Bathroom":    bathroom,
+        "Furnishing":  furn_val,
+        "Car_Parking": car_parking,
+        "Balcony":     balcony,
     }
 
-    # If you dropped weak features during training,
-    # final_features may be a subset of the above; select/align accordingly:
+    # [CHANGED] one-hot Location based on the trained schema
     if not final_features:
         raise RuntimeError("Feature schema not loaded.")
+    loc_cols = [c for c in final_features if c.startswith("Loc_")]
+    for c in loc_cols:
+        row[c] = 0.0
+    loc_key = f"Loc_{location_str}"
+    if loc_key in loc_cols:
+        row[loc_key] = 1.0
+    else:
+        # unseen location -> keep all zeros, or raise error if you prefer
+        pass
 
-    # Create DF with exact column order expected by the model
-    df = pd.DataFrame([row])[final_features].astype(np.float32)  # [UPDATED] dtype match
+    # If you added Carpet_to_Super in training, also compute it here:
+    # row["Carpet_to_Super"] = max(0.0, min(1.0, carpet_area / super_area))
+    if "Carpet_to_Super" in final_features:
+        row["Carpet_to_Super"] = max(0.0, min(1.0, carpet_area / super_area))
+
+
+    # Align to exact order and dtype
+    df = pd.DataFrame([row], columns=final_features).astype(np.float32)
     return df
 
 def classify_fairness(user_df: pd.DataFrame, entered_price: float, tolerance: float = 0.30):
-    """
-    Classify price as Fair/Overpriced/Underpriced using model prediction and tolerance band.
-    - tolerance=0.30 => ±30% band around predicted fair price
-    """
     fair_price = float(model.predict(user_df)[0])
-
-    # Guard against edge cases
     if fair_price <= 0:
         return {
             "status": "Check Data",
@@ -104,16 +111,13 @@ def classify_fairness(user_df: pd.DataFrame, entered_price: float, tolerance: fl
             "difference": round(entered_price - fair_price, 2),
             "percentage_diff": None
         }
-
     pct_diff = ((entered_price - fair_price) / fair_price) * 100.0
-
     if entered_price > fair_price * (1 + tolerance):
         status = "Overpriced"
     elif entered_price < fair_price * (1 - tolerance):
         status = "Underpriced"
     else:
         status = "Fair"
-
     return {
         "status": status,
         "fair_price": round(fair_price, 2),
@@ -122,16 +126,12 @@ def classify_fairness(user_df: pd.DataFrame, entered_price: float, tolerance: fl
         "percentage_diff": round(pct_diff, 2)
     }
 
-# -----------------------------
-# Routes
-# -----------------------------
 @app.route("/")
 def home():
     return render_template("index.html")
 
 @app.route("/health", methods=["GET"])
 def health():
-    """Simple health/ready check."""
     return jsonify({
         "model_loaded": model is not None,
         "features_loaded": final_features is not None
@@ -139,33 +139,24 @@ def health():
 
 @app.route("/analyze", methods=["POST"])
 def analyze():
-    """Analyze property price fairness."""
     try:
         if model is None or final_features is None:
-            return jsonify({"error": "Model or feature schema not loaded. Train first or place files correctly."}), 500
+            return jsonify({"error": "Model or feature schema not loaded."}), 500
 
         data = request.get_json(force=True)
 
-        # Basic input validation for entered price
-        try:
-            entered_price = float(data["price"])
-        except Exception:
-            return jsonify({"error": "Invalid 'price' value."}), 400
-
-        if entered_price <= 0:
-            return jsonify({"error": "Price must be greater than zero."}), 400
-
-        # Build model input in correct order & dtype
+        # Build model input (performs validation inside)
         user_df = make_model_input(data)
+        entered_price = float(data["price"])
 
-        # Classify fairness
-        result = classify_fairness(user_df, entered_price, tolerance=0.30)  # keep same 30% band
+        result = classify_fairness(user_df, entered_price, tolerance=0.30)
+        # [CHANGED] echo features used (handy for debugging)
+        result["used_features"] = user_df.iloc[0].astype(float).to_dict()
         return jsonify(result)
-
     except Exception as e:
         return jsonify({"error": str(e)}), 400
 
 if __name__ == "__main__":
     import os
-    port = int(os.environ.get("PORT", 8080))  # Railway sets PORT
+    port = int(os.environ.get("PORT", 8080))
     app.run(host="0.0.0.0", port=port, debug=False)

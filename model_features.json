@@ -1,7 +1,12 @@
 {
   "features": [
+    "Loc_Colombo",
+    "Loc_Colombo Suburbs",
+    "Loc_Other Urban",
+    "Loc_Other Rural",
     "Super_Area",
     "Carpet_Area",
+    "Carpet_to_Super",
     "Bathroom",
     "Furnishing",
     "Car_Parking"
