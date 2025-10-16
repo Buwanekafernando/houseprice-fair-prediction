@@ -6,9 +6,9 @@ from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score, accuracy_score, classification_report, confusion_matrix
 
-# ------------------------
+
 # First Preprocess by Savindi
-# ------------------------
+
 path = "/content/house_prices.csv"
 df = pd.read_csv(path, encoding="latin1", engine="python", on_bad_lines="skip")
 
