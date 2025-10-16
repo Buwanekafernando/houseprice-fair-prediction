@@ -1,4 +1,4 @@
-# ==== Imports ====
+# imports
 import os
 import json
 import numpy as np
@@ -10,16 +10,16 @@ from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 from sklearn.inspection import permutation_importance
 from joblib import dump
 
-# ======================================================
-# 1) Load and prepare data
-# ======================================================
+
+#Load data
+
 df = pd.read_csv("cleaned_data.csv")
 
-# ---------- Location cleaning & one-hot ----------
-# [CHANGED] Normalize Location to 4 named categories and one-hot encode
+
+#one-hot encode
 df["Location"] = df["Location"].astype(str).str.strip()
 
-# If earlier you had numeric codes (0..4), map them back to names
+
 numeric_back_map = {
     "4": "Colombo Suburbs",
     "3": "Colombo",
@@ -30,7 +30,7 @@ numeric_back_map = {
 if df["Location"].str.fullmatch(r"\d+").any():
     df["Location"] = df["Location"].map(numeric_back_map).fillna("Unknown")
 
-# Standardize common variants (optional)
+#mappings
 alias_map = {
     "colombo": "Colombo",
     "colombo suburbs": "Colombo Suburbs",
@@ -44,22 +44,20 @@ df["Location"] = pd.Categorical(df["Location"], categories=expected_locs)
 unknown_mask = df["Location"].isna()
 if unknown_mask.any():
     print("[WARN] Found rows with unknown Location. Count:", int(unknown_mask.sum()))
-    # keep them → all Loc_* will be 0 after get_dummies (or drop if you prefer)
-# One-hot (creates exactly Loc_Colombo, Loc_Colombo Suburbs, Loc_Other Urban, Loc_Other Rural)
+   
 df = pd.get_dummies(df, columns=["Location"], prefix="Loc", drop_first=False)
 
-# ---------- Other mappings ----------
+
 furnish_map = {"Semi-Furnished": 3, "Furnished": 2, "Unfurnished": 1}
 df["Furnishing"] = df["Furnishing"].map(furnish_map)
 df["Car_Parking"] = df["Car_Parking"].astype(int)
 
-# ---------- Feature set ----------
+
 loc_cols = [c for c in df.columns if c.startswith("Loc_")]
-# Optional engineered feature (uncomment to try)
+
 df["Carpet_to_Super"] = (df["Carpet_Area"] / df["Super_Area"]).clip(0, 1)
 
-#features = loc_cols + ["Super_Area", "Carpet_Area", "Bathroom", "Furnishing", "Car_Parking", "Balcony"]
-# If you enabled Carpet_to_Super above:
+
 features = loc_cols + ["Super_Area", "Carpet_Area", "Carpet_to_Super", "Bathroom", "Furnishing", "Car_Parking", "Balcony"]
 
 X = df[features]
@@ -68,9 +66,7 @@ y = df["Amount_in_rupees"] * 3.4
 # Split
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
-# ======================================================
-# 2) Baseline
-# ======================================================
+
 baseline_model = RandomForestRegressor(n_estimators=200, random_state=42)
 baseline_model.fit(X_train, y_train)
 y_pred_base = baseline_model.predict(X_test)
@@ -83,17 +79,15 @@ baseline_mape = float(np.mean(np.abs((y_test[mask_base] - y_pred_base[mask_base]
 print("Baseline RMSE:", baseline_rmse)
 print(f"Baseline MAPE: {baseline_mape:.2f}%  (≈ Accuracy: {100 - baseline_mape:.2f}%)")
 
-# ======================================================
-# 3) Light casting
-# ======================================================
+
 X_train_ = X_train.astype(np.float32)
 X_test_  = X_test.astype(np.float32)
 y_train_ = y_train.astype(np.float32)
 y_test_  = y_test.astype(np.float32)
 
-# ======================================================
-# 4) Hyperparameter tuning (RandomizedSearchCV)
-# ======================================================
+
+# Hyperparameter tuning
+
 cv = KFold(n_splits=5, shuffle=True, random_state=42)
 param_dist = {
     "n_estimators": np.arange(150, 900, 50),
@@ -132,9 +126,8 @@ mask_tuned = (y_test_ != 0)
 tuned_mape = float(np.mean(np.abs((y_test_[mask_tuned] - y_pred_tuned[mask_tuned]) / y_test_[mask_tuned])) * 100)
 print(f"[UPDATED] Tuned Test MAPE: {tuned_mape:.2f}%  (≈ Accuracy: {100 - tuned_mape:.2f}%)")
 
-# ======================================================
-# 5) Compact the forest by refitting at each size (no warm_start)
-# ======================================================
+#Compact the forest 
+
 def grow_until_plateau_refit(base_params, X, y, start=50, step=25, max_trees=900, patience=3, min_gain=1e-4):
     best_model = None
     best_oob = -np.inf
@@ -179,9 +172,9 @@ mask_comp = (y_test_ != 0)
 compact_mape = float(np.mean(np.abs((y_test_[mask_comp] - y_pred_compact[mask_comp]) / y_test_[mask_comp])) * 100)
 print(f"[UPDATED] Compact Test MAPE: {compact_mape:.2f}%  (≈ Accuracy: {100 - compact_mape:.2f}%)")
 
-# ======================================================
-# 6) Permutation importance (do NOT drop Loc_* even if weak)
-# ======================================================
+
+#Permutation importance
+
 perm = permutation_importance(rf_compact, X_test_, y_test_, n_repeats=10, random_state=42, n_jobs=-1)
 pi = pd.Series(perm.importances_mean, index=X_test_.columns).sort_values()
 print("\n[UPDATED] Permutation importance (mean):")
@@ -190,7 +183,7 @@ print(pi)
 weak = list(pi[pi <= 0].index)
 final_features = list(X_train_.columns)
 
-# [CHANGED] If you want to prune, do not drop location columns so Location remains in the model
+
 weak_nonloc = [c for c in weak if not c.startswith("Loc_")]
 if weak_nonloc:
     print("\n[UPDATED] Dropping weak NON-Location features and re-fitting:", weak_nonloc)
@@ -205,14 +198,14 @@ if weak_nonloc:
     mask_re = (y_test_ != 0)
     refit_mape = float(np.mean(np.abs((y_test_[mask_re] - y_pred_re[mask_re]) / y_test_[mask_re])) * 100)
     print(f"[UPDATED] Refit(no-weak) Test MAPE: {refit_mape:.2f}%  (≈ Accuracy: {100 - refit_mape:.2f}%)")
-    final_features = list(X_train_re.columns)  # keep this smaller schema
+    final_features = list(X_train_re.columns)  # keep smaller schema
 else:
     print("\n[UPDATED] No weak non-location features to drop. Keeping all features.")
     final_features = list(X_train_.columns)
 
-# ======================================================
-# 7) Save model + feature schema
-# ======================================================
+
+# Save model + feature schema
+
 model_path = "rf_price_model_xz.joblib"
 dump(rf_compact, model_path, compress=("xz", 3))
 size_mb = os.path.getsize(model_path) / (1024 * 1024)
@@ -222,9 +215,9 @@ with open("model_features.json", "w") as f:
     json.dump({"features": final_features}, f, indent=2)
 print("[UPDATED] Saved feature schema -> model_features.json:", final_features)
 
-# ======================================================
-# 8) Inference helper
-# ======================================================
+
+#Inference helper
+
 def predict_price(incoming_dict):
     import numpy as _np
     import pandas as _pd

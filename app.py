@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 from joblib import load
 
-# [CHANGED] point Flask to "frontend" folder (your index.html lives here)
+#points Flask to "frontend" folder
 app = Flask(__name__, template_folder="frontend")
 
 MODEL_PATH = "rf_price_model_xz.joblib"
@@ -15,18 +15,18 @@ final_features = None
 
 try:
     model = load(MODEL_PATH)
-    print("✅ Model loaded successfully!")
+    print("Model loaded successfully!")
 except Exception as e:
-    print(f"❌ Failed to load model: {e}")
+    print(f"Failed to load model: {e}")
 
 try:
     with open(FEATS_PATH, "r") as f:
         final_features = json.load(f)["features"]
-    print("✅ Feature schema loaded:", final_features)
+    print("Feature schema loaded:", final_features)
 except Exception as e:
-    print(f"❌ Failed to load feature schema: {e}")
+    print(f"Failed to load feature schema: {e}")
 
-# Furnishing numeric map (same as training)
+# words to numeric
 furnish_map  = {"Furnished": 3, "Semi-Furnished": 2, "Unfurnished": 1}
 
 def make_model_input(payload: dict) -> pd.DataFrame:
@@ -54,7 +54,7 @@ def make_model_input(payload: dict) -> pd.DataFrame:
 
     if super_area <= 0 or carpet_area <= 0:
         raise ValueError("Areas must be greater than zero.")
-    if carpet_area > super_area:  # [CHANGED] strong validation
+    if carpet_area > super_area:  #validation
         raise ValueError("Carpet Area cannot be greater than Super Area.")
     if price <= 0:
         raise ValueError("Price must be greater than zero.")
@@ -67,7 +67,7 @@ def make_model_input(payload: dict) -> pd.DataFrame:
 
     location_str = str(payload["location"]).strip()
 
-    # Base row (non-location)
+    
     row = {
         "Super_Area":  super_area,
         "Carpet_Area": carpet_area,
@@ -77,7 +77,7 @@ def make_model_input(payload: dict) -> pd.DataFrame:
         "Balcony":     balcony,
     }
 
-    # [CHANGED] one-hot Location based on the trained schema
+    # one-hot Location
     if not final_features:
         raise RuntimeError("Feature schema not loaded.")
     loc_cols = [c for c in final_features if c.startswith("Loc_")]
@@ -87,16 +87,15 @@ def make_model_input(payload: dict) -> pd.DataFrame:
     if loc_key in loc_cols:
         row[loc_key] = 1.0
     else:
-        # unseen location -> keep all zeros, or raise error if you prefer
+       
         pass
 
-    # If you added Carpet_to_Super in training, also compute it here:
-    # row["Carpet_to_Super"] = max(0.0, min(1.0, carpet_area / super_area))
+    
     if "Carpet_to_Super" in final_features:
         row["Carpet_to_Super"] = max(0.0, min(1.0, carpet_area / super_area))
 
 
-    # Align to exact order and dtype
+    
     df = pd.DataFrame([row], columns=final_features).astype(np.float32)
     return df
 
@@ -145,12 +144,12 @@ def analyze():
 
         data = request.get_json(force=True)
 
-        # Build model input (performs validation inside)
+        #model input
         user_df = make_model_input(data)
         entered_price = float(data["price"])
 
         result = classify_fairness(user_df, entered_price, tolerance=0.30)
-        # [CHANGED] echo features used (handy for debugging)
+        
         result["used_features"] = user_df.iloc[0].astype(float).to_dict()
         return jsonify(result)
     except Exception as e:
