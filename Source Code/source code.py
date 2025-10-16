@@ -108,7 +108,7 @@ df = df.rename(columns={
 df.to_csv("/content/house_prices_cleaned.csv", index=False)
 
 # ------------------------
-# Further Preprocess by Buddhima
+# Further Preprocess by Buddima
 # ------------------------
 df = pd.read_csv("/content/house_prices_cleaned.csv")
 df.columns = df.columns.str.strip().str.replace(' ', '_')
@@ -203,5 +203,5 @@ y_test_labels = generate_fairness_labels(y_test, y_pred, 0.3)
 user_input = {"Location": 1, "Super_Area": 1500, "Carpet_Area": 1200, "Bathroom": 2, "Furnishing": 3, "Car_Parking": 1, "Balcony": 2}
 entered_price = 800000
 result, fair_price = classify_fairness_regression(user_input, entered_price, model)
-print("Entered price is:", result)
-print("Estimated fair price:", fair_price)
+print("Entered Price is:", result)
+print("Estimated fair Price:", fair_price)
